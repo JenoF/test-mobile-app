@@ -200,7 +200,6 @@
         <div id="presets">
             <span style="font-size: 11px; color: #9ca3af; align-self: center;">Presets:</span>
             <button class="preset-chip" onclick="setPreset('https://game.aq.com/game/loader.swf')">AQWorlds</button>
-            <button class="preset-chip" onclick="setPreset('https://www.kongregate.com/games/chris/potty-racers')">Custom SWF URL</button>
         </div>
 
         <!-- Flash Emulator Viewport -->
@@ -239,20 +238,23 @@
         });
 
         async function loadFlash() {
-            const url = document.getElementById('swf-input').value;
+            let rawUrl = document.getElementById('swf-input').value;
             const container = document.getElementById('ruffle-stage');
             container.innerHTML = ""; // Clear old instance
+
+            // Route through a public CORS proxy to bypass server blocks
+            const targetUrl = "https://api.allorigins.win/raw?url=" + encodeURIComponent(rawUrl);
 
             player = ruffle.createPlayer();
             container.appendChild(player);
 
             try {
                 await player.load({
-                    url: url,
+                    url: targetUrl,
                     allowScriptAccess: true
                 });
             } catch (e) {
-                alert("Failed to load SWF file. Cross-domain restriction might apply.");
+                alert("Failed to load SWF file. Check URL or proxy connection.");
                 console.error(e);
             }
         }
@@ -267,7 +269,6 @@
             controls.style.display = controls.style.display === 'none' ? 'flex' : 'none';
         }
 
-        // Simulate Keyboard actions from touch buttons onto the Flash player
         function simulateKey(code, type) {
             if (!player) return;
             const event = new KeyboardEvent(type, {
