@@ -1,2 +1,282 @@
-# test-mobile-app
-test
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Mobile Flash & AQW Player</title>
+    <!-- Load Ruffle Emulator from CDN -->
+    <script src="https://unpkg.com/@ruffle-rs/ruffle"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        body, html {
+            width: 100%;
+            height: 100%;
+            background-color: #0b0f19;
+            color: #ffffff;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            overflow: hidden;
+            position: fixed;
+        }
+
+        #app-container {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Top Bar */
+        #toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: #151b2b;
+            padding: 8px 12px;
+            border-bottom: 1px solid #2a344d;
+            height: 50px;
+            z-index: 10;
+        }
+
+        .url-box {
+            display: flex;
+            flex: 1;
+            background: #0b0f19;
+            border: 1px solid #3b4c70;
+            border-radius: 6px;
+            overflow: hidden;
+            margin-right: 8px;
+        }
+
+        .url-box input {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: #fff;
+            padding: 6px 10px;
+            font-size: 13px;
+            outline: none;
+        }
+
+        .btn {
+            background: #2563eb;
+            color: white;
+            border: none;
+            padding: 6px 14px;
+            font-weight: 600;
+            border-radius: 4px;
+            font-size: 13px;
+            cursor: pointer;
+        }
+
+        .btn-secondary {
+            background: #374151;
+            margin-left: 4px;
+        }
+
+        /* Flash Screen Area */
+        #player-container {
+            flex: 1;
+            background: #000;
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+
+        #ruffle-stage {
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Mobile Touch Overlay Controller */
+        #touch-controls {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 140px;
+            pointer-events: none;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            padding: 15px;
+            z-index: 100;
+            background: linear-gradient(to top, rgba(0,0,0,0.6), transparent);
+        }
+
+        .dpad {
+            position: relative;
+            width: 110px;
+            height: 110px;
+            pointer-events: auto;
+        }
+
+        .dpad-btn {
+            position: absolute;
+            background: rgba(255, 255, 255, 0.15);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            border-radius: 8px;
+            backdrop-filter: blur(4px);
+        }
+
+        .dpad-up    { top: 0; left: 35px; width: 40px; height: 35px; }
+        .dpad-down  { bottom: 0; left: 35px; width: 40px; height: 35px; }
+        .dpad-left  { top: 35px; left: 0; width: 35px; height: 40px; }
+        .dpad-right { top: 35px; right: 0; width: 35px; height: 40px; }
+
+        .action-pad {
+            display: grid;
+            grid-template-columns: repeat(3, 45px);
+            gap: 8px;
+            pointer-events: auto;
+        }
+
+        .action-btn {
+            background: rgba(37, 99, 235, 0.4);
+            border: 1px solid rgba(59, 130, 246, 0.6);
+            color: white;
+            height: 45px;
+            border-radius: 50%;
+            font-weight: bold;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(4px);
+        }
+
+        .action-btn:active, .dpad-btn:active {
+            background: rgba(255, 255, 255, 0.4);
+        }
+
+        /* Preset Overlay for AQW / Common Games */
+        #presets {
+            display: flex;
+            gap: 6px;
+            overflow-x: auto;
+            background: #111827;
+            padding: 6px 12px;
+            border-bottom: 1px solid #1f2937;
+        }
+
+        .preset-chip {
+            background: #1f2937;
+            border: 1px solid #374151;
+            color: #d1d5db;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            white-space: nowrap;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="app-container">
+        <!-- Top Toolbar -->
+        <div id="toolbar">
+            <div class="url-box">
+                <input type="text" id="swf-input" placeholder="Paste .swf URL here..." value="https://game.aq.com/game/loader.swf">
+            </div>
+            <button class="btn" onclick="loadFlash()">Load</button>
+            <button class="btn btn-secondary" onclick="toggleControls()">🎮</button>
+        </div>
+
+        <!-- Quick Game Presets -->
+        <div id="presets">
+            <span style="font-size: 11px; color: #9ca3af; align-self: center;">Presets:</span>
+            <button class="preset-chip" onclick="setPreset('https://game.aq.com/game/loader.swf')">AQWorlds</button>
+            <button class="preset-chip" onclick="setPreset('https://www.kongregate.com/games/chris/potty-racers')">Custom SWF URL</button>
+        </div>
+
+        <!-- Flash Emulator Viewport -->
+        <div id="player-container">
+            <div id="ruffle-stage"></div>
+
+            <!-- Virtual On-Screen Gamepad for Mobile Touch -->
+            <div id="touch-controls">
+                <div class="dpad">
+                    <div class="dpad-btn dpad-up" ontouchstart="simulateKey('ArrowUp', 'keydown')" ontouchend="simulateKey('ArrowUp', 'keyup')">▲</div>
+                    <div class="dpad-btn dpad-left" ontouchstart="simulateKey('ArrowLeft', 'keydown')" ontouchend="simulateKey('ArrowLeft', 'keyup')">◀</div>
+                    <div class="dpad-btn dpad-right" ontouchstart="simulateKey('ArrowRight', 'keydown')" ontouchend="simulateKey('ArrowRight', 'keyup')">▶</div>
+                    <div class="dpad-btn dpad-down" ontouchstart="simulateKey('ArrowDown', 'keydown')" ontouchend="simulateKey('ArrowDown', 'keyup')">▼</div>
+                </div>
+
+                <div class="action-pad">
+                    <div class="action-btn" ontouchstart="simulateKey('Digit1', 'keydown')" ontouchend="simulateKey('Digit1', 'keyup')">1</div>
+                    <div class="action-btn" ontouchstart="simulateKey('Digit2', 'keydown')" ontouchend="simulateKey('Digit2', 'keyup')">2</div>
+                    <div class="action-btn" ontouchstart="simulateKey('Digit3', 'keydown')" ontouchend="simulateKey('Digit3', 'keyup')">3</div>
+                    <div class="action-btn" ontouchstart="simulateKey('Digit4', 'keydown')" ontouchend="simulateKey('Digit4', 'keyup')">4</div>
+                    <div class="action-btn" ontouchstart="simulateKey('Space', 'keydown')" ontouchend="simulateKey('Space', 'keyup')">SPC</div>
+                    <div class="action-btn" ontouchstart="simulateKey('Enter', 'keydown')" ontouchend="simulateKey('Enter', 'keyup')">ENT</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        window.RufflePlayer = window.RufflePlayer || {};
+        let ruffle;
+        let player;
+
+        window.addEventListener("DOMContentLoaded", () => {
+            ruffle = window.RufflePlayer.newest();
+            loadFlash();
+        });
+
+        async function loadFlash() {
+            const url = document.getElementById('swf-input').value;
+            const container = document.getElementById('ruffle-stage');
+            container.innerHTML = ""; // Clear old instance
+
+            player = ruffle.createPlayer();
+            container.appendChild(player);
+
+            try {
+                await player.load({
+                    url: url,
+                    allowScriptAccess: true
+                });
+            } catch (e) {
+                alert("Failed to load SWF file. Cross-domain restriction might apply.");
+                console.error(e);
+            }
+        }
+
+        function setPreset(url) {
+            document.getElementById('swf-input').value = url;
+            loadFlash();
+        }
+
+        function toggleControls() {
+            const controls = document.getElementById('touch-controls');
+            controls.style.display = controls.style.display === 'none' ? 'flex' : 'none';
+        }
+
+        // Simulate Keyboard actions from touch buttons onto the Flash player
+        function simulateKey(code, type) {
+            if (!player) return;
+            const event = new KeyboardEvent(type, {
+                code: code,
+                key: code.replace('Digit', ''),
+                bubbles: true
+            });
+            player.dispatchEvent(event);
+        }
+    </script>
+</body>
+</html>
